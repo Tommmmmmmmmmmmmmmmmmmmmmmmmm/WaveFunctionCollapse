@@ -1,0 +1,5 @@
+empty 0, corner 3, corner 2, empty 0, empty 0, 
+empty 0, corner 0, cross 1, corner 2, empty 0, 
+empty 0, empty 0, line 1, corner 0, corner 2, 
+corner 3, line 0, cross 1, line 0, corner 1, 
+corner 1, empty 0, corner 0, line 0, line 0, 

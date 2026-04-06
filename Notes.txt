@@ -1,0 +1,8 @@
+
+
+this solution is directly pulled from gumins git repo
+
+program.cs is where im going to be making most of my changes
+
+ill probably use AI fairly heavily in the code part of this assignment, currently its made several adjustments to help me collect data about the algorithm
+plus geerated the python script to display that data in a couple graphs
