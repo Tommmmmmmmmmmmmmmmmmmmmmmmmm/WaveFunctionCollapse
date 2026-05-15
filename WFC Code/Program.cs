@@ -6,8 +6,8 @@ using System.Diagnostics;
 
 static class Program
 {
-    const int ATTEMPTS = 100;
-    const int MAX_OBSERVATIONS = 100000; 
+    const int ATTEMPTS = 1000;
+    const int MAX_OBSERVATIONS = 100000;
 
     enum Strategy { Baseline, Fixed, Relative }
 
@@ -20,24 +20,26 @@ static class Program
         using var csv = new StreamWriter(csvPath);
         csv.WriteLine("strategy,parameter,name,filename,N,size,periodic,symmetry,heuristic,attempts,contradictions,successes,contradiction_rate,avg_observations");
 
-        // 1. Run Baseline (0 Backtracks) + timing
-        Console.WriteLine("\n==============================================");
-        Console.WriteLine("   STARTING BASELINE SIMULATION (0 BACKTRACKS)");
-        Console.WriteLine("==============================================");
-        var baselineStopwatch = Stopwatch.StartNew();
-        RunSimulation(xdoc, csv, Strategy.Baseline, 0);
-        baselineStopwatch.Stop();
-        Console.WriteLine($"Baseline (0 backtracks) total time: {baselineStopwatch.Elapsed}");
+        //// 1. Run Baseline (0 Backtracks) + timing
+        //Console.WriteLine("\n==============================================");
+        //Console.WriteLine("   STARTING BASELINE SIMULATION (0 BACKTRACKS)");
+        //Console.WriteLine("==============================================");
+        //var baselineStopwatch = Stopwatch.StartNew();
+        //RunSimulation(xdoc, csv, Strategy.Baseline, 0);
+        //baselineStopwatch.Stop();
+        //Console.WriteLine($"Baseline (0 backtracks) total time: {baselineStopwatch.Elapsed}");
 
-        // 2. Test Fixed Backtracks limit distances
+        //// 2. Test Fixed Backtracks limit distances
+        ////for (int backtrackLimit = 250; backtrackLimit <= 850; backtrackLimit += 25)
         //for (int backtrackLimit = 100; backtrackLimit <= 2000; backtrackLimit += 100)
-        for (int backtrackLimit = 250; backtrackLimit <= 850; backtrackLimit += 25)
-        {
-            Console.WriteLine("\n==============================================");
-            Console.WriteLine($"   STARTING FIXED BACKTRACK (LIMIT {backtrackLimit})");
-            Console.WriteLine("==============================================");
-            RunSimulation(xdoc, csv, Strategy.Fixed, backtrackLimit);
-        }
+        //{
+        //    Console.WriteLine("\n==============================================");
+        //    Console.WriteLine($"   STARTING FIXED BACKTRACK (LIMIT {backtrackLimit})");
+        //    Console.WriteLine("==============================================");
+        //    RunSimulation(xdoc, csv, Strategy.Fixed, backtrackLimit);
+        //}
+
+        RunSimulation(xdoc, csv, Strategy.Fixed, 700);
 
         //// 3. Test Progress-Relative Backtracks
         //double[] relativeFactors = { 0.10, 0.20, 0.30, 0.40, 0.50, 0.60,  0.70,  0.80,  0.90 };
@@ -48,7 +50,7 @@ static class Program
         //    Console.WriteLine("==============================================");
         //    RunSimulation(xdoc, csv, Strategy.Relative, factor);
         //}
-        
+
         Console.WriteLine($"\n simulations complete - combined CSV saved to {Path.GetFullPath(csvPath)}");
     }
 
@@ -110,7 +112,7 @@ static class Program
 
                 bool success = model.Run(seed, xelem.Get("limit", -1), getDivergencePoint, MAX_OBSERVATIONS);
 
-                totalObservations += model.TotalObservations;
+                totalObservations += model.currentObservations;
 
                 if (success)
                 {

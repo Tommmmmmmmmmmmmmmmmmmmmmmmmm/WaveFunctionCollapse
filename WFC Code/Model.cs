@@ -27,7 +27,7 @@ abstract class Model
     public enum Heuristic { Entropy, MRV, Scanline };
     Heuristic heuristic;
 
-    public int TotalObservations { get; private set; }
+    public int currentObservations { get; private set; }
 
     protected Model(int width, int height, int N, bool periodic, Heuristic heuristic)
     {
@@ -77,33 +77,24 @@ abstract class Model
     {
         if (wave == null) Init();
 
-        TotalObservations = 0;
-        var divergencePoints = new List<int>();
-        var replaySteps = new List<(int node, int pattern)>();
-        int backtrackAttempt = 0;
+        currentObservations = 0;
+        List<(int node, int pattern)> replaySteps = null;
 
         Random random = new(seed);
 
+        // runs once per attempt
         while (true)
         {
             Clear();
             int currentDepth = 0;
             bool contradiction = false;
-            int replayLimit = divergencePoints.Count == 0 ? -1 : divergencePoints[^1];
             var currentSteps = new List<(int node, int pattern)>();
-            bool loggedDivergenceStep = false;
-
-            // If we are backtracking, we must replay from the original seed to reproduce the exact prefix
-            if (divergencePoints.Count > 0)
-            {
-                random = replayLimit == 0
-                    ? new Random(HashCode.Combine(seed, backtrackAttempt))
-                    : new Random(seed);
-            }
-
+            bool reseededAtDivergence = false;
+            
+            // runs a number of times based on the divergence data
             for (int l = 0; l < limit || limit < 0; l++)
             {
-                if (maxObservations > 0 && TotalObservations >= maxObservations)
+                if (currentObservations >= maxObservations)
                 {
                     return false;
                 }
@@ -111,10 +102,18 @@ abstract class Model
                 int? forcedNode = null;
                 int? forcedPattern = null;
 
-                if (replayLimit >= 0 && currentDepth < replayLimit && currentDepth < replaySteps.Count)
+                if (replaySteps != null)
                 {
-                    forcedNode = replaySteps[currentDepth].node;
-                    forcedPattern = replaySteps[currentDepth].pattern;
+                    if (currentDepth < replaySteps.Count)
+                    {
+                        forcedNode = replaySteps[currentDepth].node;
+                        forcedPattern = replaySteps[currentDepth].pattern;
+                    }
+                    else if (currentDepth == replaySteps.Count && !reseededAtDivergence)
+                    {
+                        random = new Random(Random.Shared.Next());
+                        reseededAtDivergence = true;
+                    }
                 }
 
                 int node = forcedNode ?? NextUnobservedNode(random);
@@ -127,18 +126,23 @@ abstract class Model
                         break;
                     }
 
-                    int pattern = SelectPattern(node, random, forcedPattern);
+                    int pattern;
+                    if (forcedPattern.HasValue)
+                    {
+                        pattern = wave[node][forcedPattern.Value] ? forcedPattern.Value : -1;
+                    }
+                    else
+                    {
+                        bool[] w = wave[node];
+                        for (int t = 0; t < T; t++) distribution[t] = w[t] ? weights[t] : 0.0;
+                        pattern = distribution.Random(random.NextDouble());
+                    }
+
                     if (pattern < 0)
                     {
                         contradiction = true;
                         break;
                     }
-
-                    //if (!loggedDivergenceStep && divergencePoints.Count > 0 && forcedNode is null)
-                    //{
-                    //    Console.WriteLine($"seed {seed} depth {currentDepth} node {node} pattern {pattern}");
-                    //    loggedDivergenceStep = true;
-                    //}
 
                     Observe(node, pattern);
                     currentSteps.Add((node, pattern));
@@ -147,7 +151,7 @@ abstract class Model
 
                     if (!forcedNode.HasValue)
                     {
-                        TotalObservations++;
+                        currentObservations++;
                     }
 
                     if (!Propagate())
@@ -175,45 +179,25 @@ abstract class Model
                 return true;
             }
 
-            //Console.WriteLine($"contradiction at depth={currentDepth}");
-
-            replaySteps = currentSteps;
-
-            // --- DELEGATE STRATEGY EXECUTED HERE ---
             int newDivergencePoint = getDivergencePoint?.Invoke(currentDepth) ?? -1;
 
-            if (newDivergencePoint < 0)
+            // Process the failed attempt and prepare for backtracking
+            if (newDivergencePoint >= 0)
             {
-                divergencePoints.Clear();
+                replaySteps = currentSteps;
+                
+                // Trim the steps down to the divergence point
+                if (newDivergencePoint < replaySteps.Count)
+                {
+                    replaySteps.RemoveRange(newDivergencePoint, replaySteps.Count - newDivergencePoint);
+                }
             }
             else
             {
-                while (divergencePoints.Count > 0 && divergencePoints[^1] > newDivergencePoint)
-                {
-                    divergencePoints.RemoveAt(divergencePoints.Count - 1);
-                }
-
-                if (divergencePoints.Count == 0 || divergencePoints[^1] != newDivergencePoint)
-                {
-                    divergencePoints.Add(newDivergencePoint);
-                }
-
-                backtrackAttempt++;
+                // Setting to null drops the backtrack logic entirely for the next run
+                replaySteps = null;
             }
         }
-    }
-
-    int SelectPattern(int node, Random random, int? forcedPattern)
-    {
-        bool[] w = wave[node];
-        for (int t = 0; t < T; t++) distribution[t] = w[t] ? weights[t] : 0.0;
-
-        if (forcedPattern.HasValue)
-        {
-            return w[forcedPattern.Value] ? forcedPattern.Value : -1;
-        }
-
-        return distribution.Random(random.NextDouble());
     }
 
     int NextUnobservedNode(Random random)
